@@ -28,6 +28,24 @@ In this final project, you will implement the missing parts in the schematic. To
   * Mac: same deal as make - [install Xcode command line tools](https://developer.apple.com/xcode/features/)
   * Windows: recommend using [MinGW](http://www.mingw.org/)
 
+### Docker setup
+
+Alternatively you can setup the environment using the dockerfile in this project. To achieve this you can simply do the following steps:
+
+1. Build Dockerfile
+
+    `docker build -t sensor_fusion:track_an_object_in_3D_space .`
+
+2. Create container
+
+    ``docker run --name track_an_object_in_3D_space -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY -v `pwd`:/project -it --env QT_X11_NO_MITSHM=1 --device /dev/dri --privileged --gpus all sensor_fusion:track_an_object_in_3D_space``
+
+3. Everytime we want to run container
+
+    `docker start track_an_object_in_3D_space`
+
+    `docker exec -it track_an_object_in_3D_space bash`
+
 ## Basic Build Instructions
 
 1. Clone this repo.
