@@ -36,3 +36,8 @@
 
 # vscode
 .vscode/
+
+# weights
+*.weights
+dat/yolo/yolov3-tiny.weights
+dat/yolo/yolov3.weights
