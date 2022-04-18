@@ -20,4 +20,5 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
 void matchKeypointsWithBoundingBoxes(DataFrame inputFrame, std::map<int, int> &kp_bb_idxs);
 void countBB_matches(DataFrame prevFrame, std::map<int, int> kp_bb_idxs_prevFrame, DataFrame currFrame, std::map<int, int> kp_bb_idxs_currFrame, std::vector<cv::DMatch> matches, std::map<std::pair<int, int>, int> &bb_match_counter);
 void fill_bbBestMatches(std::map<std::pair<int, int>, int> bb_match_counter, std::map<int, int> &bbBestMatches);
+double removeOutliers_and_get_min(std::vector<LidarPoint> points);
 #endif /* camFusion_hpp */

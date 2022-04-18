@@ -149,7 +149,12 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC)
 {
-    // ...
+    double dt = 1.0 / frameRate;
+    double min_prev = removeOutliers_and_get_min(lidarPointsPrev);
+    double min_curr = removeOutliers_and_get_min(lidarPointsCurr);
+    double dist = abs(min_prev - min_curr);
+    // Calculate TTC assuming a constant velocity V = dist/dt
+    TTC = min_curr * dt / dist;
 }
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame, DataFrame &currFrame)
@@ -167,8 +172,11 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
 
     // fill best bounding boxes matches with the bounding boxes that have more matches
     fill_bbBestMatches(bb_match_counter, bbBestMatches);
-    
 }
+
+/* **************************************** */
+/* Below this line are all helper functions */
+/* **************************************** */
 
 void matchKeypointsWithBoundingBoxes(DataFrame inputFrame, map<int, int> &kp_bb_idxs)
 {
@@ -263,4 +271,29 @@ void fill_bbBestMatches(map<pair<int, int>, int> bb_match_counter, map<int, int>
             }
         }
     }
+}
+
+double removeOutliers_and_get_min(vector<LidarPoint> points)
+{
+    // Extract all x values
+    vector<double> xVec;
+    for (auto pt : points)
+    {
+        xVec.push_back(pt.x);
+    }
+
+    // Ordering only key elements to get quartiles
+    auto const Q1 = xVec.size() / 4;
+    auto const Q2 = xVec.size() / 2;
+    auto const Q3 = Q1 + Q2;
+
+    nth_element(xVec.begin(), xVec.begin() + Q1, xVec.end());
+    nth_element(xVec.begin() + Q1 + 1, xVec.begin() + Q2, xVec.end());
+    nth_element(xVec.begin() + Q2 + 1, xVec.begin() + Q3, xVec.end());
+    // Removing outliers that are below a lower_bound following interquartile range from statistics. Reference: https://en.wikipedia.org/wiki/Interquartile_range
+    double outlier_low_bound = xVec[Q1] - (xVec[Q3] - xVec[Q1]) * 1.5;
+    if (outlier_low_bound<0){outlier_low_bound=0.0;}
+    xVec.erase(std::remove_if(xVec.begin(), xVec.end(), [outlier_low_bound](const double &x){ return x < outlier_low_bound; }),xVec.end());
+    // return min value
+    return *min_element(xVec.begin(), xVec.end());
 }
