@@ -136,25 +136,82 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
 // associate a given bounding box with the keypoints it contains
 void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
+    vector<double> dist_vec;
+    for (auto &dm : kptMatches)
+    {
+        int prev_ind = dm.queryIdx;
+        int curr_ind = dm.trainIdx;
+
+        double euclidean_dist = cv::norm(kptsCurr[curr_ind].pt - kptsPrev[prev_ind].pt);
+        dist_vec.push_back(euclidean_dist);
+    }
+
+    // lower_boundary, upper_boundary for spotting outliers
+    pair<double, double> low_upp_b;
+    low_upp_b = get_lower_upper_boundaries(dist_vec);
+    double low_bound = low_upp_b.first;
+    double upp_bound = low_upp_b.second;
+
+    // Add only keypoints and matches that are reliable
+    for (auto &kpm : kptMatches)
+    {
+        int prev_ind = kpm.queryIdx;
+        int curr_ind = kpm.trainIdx;
+        if (boundingBox.roi.contains(kptsCurr[curr_ind].pt))
+        {
+            double curr_dist = cv::norm(kptsCurr[curr_ind].pt - kptsPrev[prev_ind].pt);
+            if (low_bound <= curr_dist <= upp_bound)
+            {
+                boundingBox.keypoints.push_back(kptsCurr[curr_ind]);
+                boundingBox.kptMatches.push_back(kpm);
+            }
+        }
+    }
 }
 
 // Compute time-to-collision (TTC) based on keypoint correspondences in successive images
 void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr,
                       std::vector<cv::DMatch> kptMatches, double frameRate, double &TTC, cv::Mat *visImg)
 {
-    // ...
+    double dt = 1.0 / frameRate;
+
+    vector<double> distRatios_vec;
+    for (auto iter1 = kptMatches.begin(); iter1 != kptMatches.end() - 1; ++iter1)
+    {
+
+        int prev_ind = iter1->queryIdx;
+        int curr_ind = iter1->trainIdx;
+        cv::KeyPoint prev_kp_i_past = kptsPrev[prev_ind];
+        cv::KeyPoint curr_kp_i_past = kptsCurr[curr_ind];
+
+        for (auto iter2 = kptMatches.begin() + 1; iter2 != kptMatches.end(); iter2++)
+        {
+            int prev_ind = iter2->queryIdx;
+            int curr_ind = iter2->trainIdx;
+            cv::KeyPoint prev_kp_i = kptsPrev[prev_ind];
+            cv::KeyPoint curr_kp_i = kptsCurr[curr_ind];
+
+            double ratio = cv::norm(curr_kp_i.pt - curr_kp_i_past.pt) / cv::norm(prev_kp_i.pt - prev_kp_i_past.pt);
+            distRatios_vec.push_back(abs(ratio));
+        }
+    }
+
+    double distRat_median = removeOutliers_and_get_median(distRatios_vec);
+
+    TTC = abs(-dt / (1.0 - distRat_median));
+
+    std::cout << "TTC using camera is " << TTC << "secs" << std::endl;
 }
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC)
 {
     double dt = 1.0 / frameRate;
-    double min_prev = removeOutliers_and_get_min(lidarPointsPrev);
-    double min_curr = removeOutliers_and_get_min(lidarPointsCurr);
-    double dist = abs(min_prev - min_curr);
+    double median_prev = removeOutliers_and_get_median(lidarPointsPrev);
+    double median_curr = removeOutliers_and_get_median(lidarPointsCurr);
+    double dist = abs(median_prev - median_curr);
     // Calculate TTC assuming a constant velocity V = dist/dt
-    TTC = min_curr * dt / dist;
+    TTC = median_curr * dt / dist;
 }
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame, DataFrame &currFrame)
@@ -273,7 +330,7 @@ void fill_bbBestMatches(map<pair<int, int>, int> bb_match_counter, map<int, int>
     }
 }
 
-double removeOutliers_and_get_min(vector<LidarPoint> points)
+double removeOutliers_and_get_median(vector<LidarPoint> points)
 {
     // Extract all x values
     vector<double> xVec;
@@ -290,10 +347,54 @@ double removeOutliers_and_get_min(vector<LidarPoint> points)
     nth_element(xVec.begin(), xVec.begin() + Q1, xVec.end());
     nth_element(xVec.begin() + Q1 + 1, xVec.begin() + Q2, xVec.end());
     nth_element(xVec.begin() + Q2 + 1, xVec.begin() + Q3, xVec.end());
+
     // Removing outliers that are below a lower_bound following interquartile range from statistics. Reference: https://en.wikipedia.org/wiki/Interquartile_range
-    double outlier_low_bound = xVec[Q1] - (xVec[Q3] - xVec[Q1]) * 1.5;
+    double IQR = (xVec[Q3] - xVec[Q1]) * 1.5;
+    double outlier_low_bound = xVec[Q1] - IQR;
+    double outlier_upper_bound = xVec[Q3] + IQR;
     if (outlier_low_bound<0){outlier_low_bound=0.0;}
-    xVec.erase(std::remove_if(xVec.begin(), xVec.end(), [outlier_low_bound](const double &x){ return x < outlier_low_bound; }),xVec.end());
-    // return min value
-    return *min_element(xVec.begin(), xVec.end());
+    xVec.erase(std::remove_if(xVec.begin(), xVec.end(), [outlier_low_bound, outlier_upper_bound](const double &x){ return (x < outlier_low_bound)||(x > outlier_upper_bound); }),xVec.end());
+    auto const new_Q2 = xVec.size() / 2;
+    nth_element(xVec.begin(), xVec.begin() + new_Q2, xVec.end());
+    // return median value
+    return xVec[new_Q2];
+}
+
+pair<double, double> get_lower_upper_boundaries(vector<double> vec)
+{
+    // Ordering only key elements to get quartiles
+    auto const Q1 = vec.size() / 4;
+    auto const Q2 = vec.size() / 2;
+    auto const Q3 = Q1 + Q2;
+
+    nth_element(vec.begin(), vec.begin() + Q1, vec.end());
+    nth_element(vec.begin() + Q1 + 1, vec.begin() + Q2, vec.end());
+    nth_element(vec.begin() + Q2 + 1, vec.begin() + Q3, vec.end());
+    // Removing outliers that are below a lower_bound following interquartile range from statistics. Reference: https://en.wikipedia.org/wiki/Interquartile_range
+    double outlier_lower_bound = vec[Q1] - (vec[Q3] - vec[Q1]) * 1.5;
+    double outlier_upper_bound = vec[Q3] + (vec[Q3] - vec[Q1]) * 1.5;
+    return make_pair(outlier_lower_bound, outlier_upper_bound);
+}
+
+double removeOutliers_and_get_median(std::vector<double> vec)
+{
+    // Ordering only key elements to get quartiles
+    auto const Q1 = vec.size() / 4;
+    auto const Q2 = vec.size() / 2;
+    auto const Q3 = Q1 + Q2;
+
+    nth_element(vec.begin(), vec.begin() + Q1, vec.end());
+    nth_element(vec.begin() + Q1 + 1, vec.begin() + Q2, vec.end());
+    nth_element(vec.begin() + Q2 + 1, vec.begin() + Q3, vec.end());
+
+    // Removing outliers that are below a lower_bound following interquartile range from statistics. Reference: https://en.wikipedia.org/wiki/Interquartile_range
+    double IQR = (vec[Q3] - vec[Q1]) * 1.5;
+    double outlier_low_bound = vec[Q1] - IQR;
+    double outlier_upper_bound = vec[Q3] + IQR;
+    if (outlier_low_bound<0){outlier_low_bound=0.0;}
+    vec.erase(std::remove_if(vec.begin(), vec.end(), [outlier_low_bound, outlier_upper_bound](const double &x){ return (x < outlier_low_bound)||(x > outlier_upper_bound); }),vec.end());
+    auto const new_Q2 = vec.size() / 2;
+    nth_element(vec.begin(), vec.begin() + new_Q2, vec.end());
+    // return median value
+    return vec[new_Q2];
 }

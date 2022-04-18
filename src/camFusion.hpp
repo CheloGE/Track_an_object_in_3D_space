@@ -18,7 +18,13 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev,
                      std::vector<LidarPoint> &lidarPointsCurr, double frameRate, double &TTC);
 void matchKeypointsWithBoundingBoxes(DataFrame inputFrame, std::map<int, int> &kp_bb_idxs);
+
+/* **************************************** */
+/* Below this line are all helper functions */
+/* **************************************** */
 void countBB_matches(DataFrame prevFrame, std::map<int, int> kp_bb_idxs_prevFrame, DataFrame currFrame, std::map<int, int> kp_bb_idxs_currFrame, std::vector<cv::DMatch> matches, std::map<std::pair<int, int>, int> &bb_match_counter);
 void fill_bbBestMatches(std::map<std::pair<int, int>, int> bb_match_counter, std::map<int, int> &bbBestMatches);
-double removeOutliers_and_get_min(std::vector<LidarPoint> points);
+double removeOutliers_and_get_median(std::vector<LidarPoint> points);
+std::pair<double, double> get_lower_upper_boundaries(std::vector<double> vec);
+double removeOutliers_and_get_median(std::vector<double> vec);
 #endif /* camFusion_hpp */
