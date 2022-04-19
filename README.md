@@ -52,3 +52,9 @@ Alternatively you can setup the environment using the dockerfile in this project
 2. Make a build directory in the top level project directory: `mkdir build && cd build`
 3. Compile: `cmake .. && make`
 4. Run it: `./3D_object_tracking`.
+
+## Project report
+
+The details of this project can be found in the [writeup.md](writeup.md) file.
+
+![](images/writeup/project_illustration.png)
