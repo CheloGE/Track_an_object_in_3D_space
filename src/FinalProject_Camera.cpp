@@ -117,7 +117,7 @@ int main(int argc, const char *argv[])
         ostringstream imgNumber;
         imgNumber << setfill('0') << setw(imgFillWidth) << imgStartIndex + imgIndex;
         string imgFullFilename = imgBasePath + imgPrefix + imgNumber.str() + imgFileType;
-
+        cout << "########## Image index " << imgIndex << " ##########" << endl;
         // load image from file
         cv::Mat img = cv::imread(imgFullFilename);
 
@@ -159,7 +159,7 @@ int main(int argc, const char *argv[])
         clusterLidarWithROI((dataBuffer.end() - 1)->boundingBoxes, (dataBuffer.end() - 1)->lidarPoints, shrinkFactor, P_rect_00, R_rect_00, RT);
 
         // Visualize 3D objects
-        bVis = false;
+        bVis = true;
         if (bVis)
         {
             show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(1500, 800), true);
@@ -313,8 +313,8 @@ int main(int argc, const char *argv[])
                         cv::rectangle(visImg, cv::Point(currBB->roi.x, currBB->roi.y), cv::Point(currBB->roi.x + currBB->roi.width, currBB->roi.y + currBB->roi.height), cv::Scalar(0, 255, 0), 2);
 
                         char str[200];
-                        sprintf(str, "TTC Lidar : %f s, TTC Camera : %f s", ttcLidar, ttcCamera);
-                        putText(visImg, str, cv::Point2f(80, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(0, 0, 255));
+                        sprintf(str, "TTC Lidar : %f [s], TTC Camera : %f [s]", ttcLidar, ttcCamera);
+                        putText(visImg, str, cv::Point2f(80, 50), cv::FONT_HERSHEY_PLAIN, 2, cv::Scalar(225, 76, 185), 4);
 
                         string windowName = "Final Results : TTC";
                         cv::namedWindow(windowName, 4);
