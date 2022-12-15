@@ -1,6 +1,6 @@
 # Track an Object in 3D Space
 
-This fail contains all information regarding the project. The goal of this project is to create a Time To Collision (TTC) estimation system for a preceding vehicle right in front of the ego vehicle, using camera and LiDAR data.
+This file contains all information regarding the project. The goal of this project is to create a Time To Collision (TTC) estimation system for a preceding vehicle right in front of the ego vehicle, using camera and LiDAR data.
 
 ![](images/writeup/project.gif)
 
